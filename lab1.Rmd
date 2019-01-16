@@ -1,0 +1,378 @@
+---
+title: "ENVH 556 Lab 1"
+author: "Magali Blanco"
+date: "1/8/2019"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+editor_options:
+  chunk_output_type: console
+urlcolor: blue
+---
+
+TO DO:
+- label tables/figures?
+- knitting error
+
+---
+ 
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = FALSE, cache=F, cache.comments = F, message = F, warning = F) 
+
+# Set R option: here we show only 2 digits when displaying
+options(digits = 2)
+
+# Clear workspace of all objects and unload all extra (non-base) packages
+rm(list = ls(all = TRUE))
+if (!is.null(sessionInfo()$otherPkgs)) {
+  res <- suppressWarnings(
+    lapply(paste('package:', names(sessionInfo()$otherPkgs), sep=""),
+      detach, character.only=TRUE, unload=TRUE, force=TRUE))
+} 
+
+# Load key packages using pacman (see below for explanation)
+my_repo <- 'http://cran.r-project.org'
+if (!require("pacman")) {install.packages("pacman", repos = my_repo)}
+
+# Key principle: Only load the packages you will need
+# Load the other packages, installing as needed.  Some reasons for packages:
+# doBy: summaryBy  -- Don't load:  now replaced by tidyr
+# reshape2:  melt() --Don't load:  now replaced by tidyr
+# knitr:  kable()
+# ggplot2: Don't load:  part of tidyverse
+# readr:   Don't load:  part of tidyverse
+# dplyr:   Don't load:  part of tidyverse  (replaces plyr -- don't load plyr!)
+# Hmisc:  describe
+# EnvStats: geoMean, geoSD, probability plotting functions
+# TODO:  modify so it only reloads packages not already loaded (use cache??)
+
+pacman::p_load(tidyverse, knitr, Hmisc, EnvStats)
+
+#set file path
+ProjectPath <- getwd()
+##make a directory if it doesn't exist
+dir.create(file.path(ProjectPath,"Datasets"), showWarnings=FALSE, recursive = TRUE)
+datapath<-file.path(ProjectPath,"Datasets")
+
+#read in the data
+DEMS<-readRDS(file.path(datapath,"DEMSCombinedPersonal.rds"))
+
+DEMSt <- as_tibble(DEMS) # tibble. can work w/ bigger datasets faster. has nice viewing format 
+
+#set seed
+set.seed(1)
+
+```
+
+
+
+#1. Introduction
+##Background
+##Rationale
+##Objectives
+ 
+REC = ecdata 
+    
+#2. Data & Methods
+##Data description
+##Statistical analysis approach
+
+We plotted ____________.
+
+We used the `tapply` and `cbind` functions to calculate summary statistics for each facility and our pollutants of interest (OC, EC, NO, NO2). This method was used over `dplyr` in order to calculate the geometric mean (GM) and geometric standard deviation (GSD).
+
+TO calculate the GM and GSD, non-positive (<=0) values for each variable were substituded with the smallest positive value for that variable. This method accounts for possible differences in the magnitude and variation of each  variable. 
+We recreated these tables for data collected underground only. 
+
+
+#3. Results
+#inlcude scatterplots in the lab exercise or just respond to hw Qs?
+#where is the Coble paper? 
+```{r data.description1, eval=F}
+#-----------------data.description1------------------
+# STUDENTS may want to edit this chunk to look at the data differently
+#
+# Here is a first pass at commands to use to check your data
+class(DEMS) # we expect this to be a data frame
+dim(DEMS) # we expect this to have 1275 rows and 17 columns
+names(DEMS) # this list should correspond to the list in the data summary document
+sapply(DEMS,class) # this gives us details on the type of each variable in the dataset
+# Now for a tidyverse option.  We will also save the version in case we want to use tidverse commands
+#(DEMSt<-as_tibble(DEMS)) # create and print the tibble DEMSt (The parentheses surrounding the command tell R to print the result of the assignment.)
+select(DEMSt,facilityno,u_s, ecdata,nodata,no2data) # our application of select zooms in to focus on the key exposure data
+```
+
+
+```{r data.description2, eval=F}
+#-----------------data.description2-------
+# Here is a first pass at commands for students to try to better understand the data
+head(DEMS) # first 6 rows and ALL variables (columns)
+summary(DEMS) # a basic summary of each variable
+##library(Hmisc)
+describe(DEMS) # a different basic summary of each variable
+xtabs(~facilityno, data=DEMS) # tallies of the number of observations by facilityno
+```
+
+```{r 2.2.3}
+#-----------------2.2.3-------
+n.obs = nrow(DEMS)
+```
+
+There are `r n.obs` observations in the DEMS dataset. Each facility has the following number of observations: 
+```{r}
+n.obs.facility = table(DEMS$facilityno)
+kable(n.obs.facility, col.names = c("Facility", "Frequency"))
+```
+
+#?? look at personal or area samples? # wk 1 slide 13/33
+These numbers do ____not______ correspond with the dataset presented in the Stewart 2010 papaer, which present 4335 personall and 3424 area measurements.
+
+The following variables have missing values:
+```{r variables.with.NAs}
+#-----------------------variables.with.NAs--------------
+
+(variables.with.NAs = names(which(sapply(DEMS, anyNA))))
+
+```
+
+The variables with the most missing data are `group2time` and `group3area`.
+```{r}
+NAs.per.variable = colSums(is.na(DEMS[names(DEMS) %in% variables.with.NAs]))
+
+```
+
+The following tables summarize the NO, NO2, OC and REC data overall and by facility. 
+
+Overall, the AM and GM show that REC and OC levels tended to be higher than NO and NO2 levels. The SD and GSD show that there was a lot of variation. 
+
+
+
+```{r summary.tables}
+#Make table(s) summarizing four exposure variables in this dataset: nodata no2data ocdata ecdata. Include AM, ASD, GM, GSD. Show these summaries both overall and at the facility level.
+#-----------summary.tables -------------
+##using tapply and cbind 
+
+#total table
+DEMSl = reshape2::melt(data =DEMS[c("facilityno", "ecdata", "no2data", "nodata", "ocdata")], id = "facilityno")
+xbar = tapply(DEMSl$value, DEMSl$variable, mean, na.rm=T)
+sd = tapply(DEMSl$value, DEMSl$variable, sd, na.rm=T)
+
+##replace values <=0 with minimum non-zero value for each variable
+DEMS2 = DEMS[c("ecdata", "no2data", "nodata", "ocdata")]
+DEMS2 = sapply(DEMS2, function(x) {ifelse(x <=0, min(x[x>0], na.rm=T), x)})
+DEMS2 = cbind(DEMS["facilityno"], DEMS2)
+DEMS2l = reshape2::melt(data =DEMS2, id = "facilityno")
+gm  <- tapply(DEMS2l$value, DEMS2l$variable, geoMean, na.rm=T)
+gsd <- tapply(DEMS2l$value, DEMS2l$variable, geoSD, na.rm=T)
+n <- tapply(DEMSl$value[!is.na(DEMSl$value)], DEMSl$variable[!is.na(DEMSl$value)],length)
+mytable = round(cbind(AM=xbar,SD=sd,GM=gm,GSD=gsd,N=n),2)
+
+kable(mytable, caption = "Summary Tabl - All Facilities")
+
+```
+
+There was no data for facility J18. Facility D21 did not collect NO or NO2 data (tables show "NaN"). For facilities that did have data for, the central tendency and variation of each pollutant varied substantially. NO, specifically, had high variation.
+
+The sample sizes in these tables are smaller than previously reported because missing values have been ignored. 
+
+```{r}
+#summary table fn by facility
+summary.table.by.facility.fn = function(var) {
+  #var = DEMS$ecdata
+  xbar<-tapply(var, DEMS$facilityno, mean, na.rm=T)
+  sd  <-tapply(var, DEMS$facilityno, sd, na.rm=T)
+  #convert numbers <=0 to the lowest postive number in the data in order to calculate gm, gsd
+  var2 = ifelse(var <=0, min(var[var > 0], na.rm=T), var)
+  gm  <-tapply(var2, DEMS$facilityno, geoMean, na.rm=T)
+  gsd <-tapply(var2, DEMS$facilityno, geoSD, na.rm=T)
+  n   <-tapply(var[!is.na(var)], DEMS$facilityno[!is.na(var)],length)
+  mytable = round(cbind(AM=xbar,SD=sd,GM=gm,GSD=gsd,N=n),2)
+
+  return(mytable)
+}
+
+##tables for: nodata no2data ocdata ecdata 
+kable(summary.table.by.facility.fn(DEMS$nodata), caption = "NO Summary Table")
+kable(summary.table.by.facility.fn(DEMS$no2data), caption = "NO2 Summary Table")
+kable(summary.table.by.facility.fn(DEMS$ocdata), caption = "OC Summary Table")
+kable(summary.table.by.facility.fn(DEMS$ecdata), caption = "EC Summary Table")
+
+```
+
+
+The following tables summarize the NO, NO2, OC and REC data overall and by facility for samples taken underground. Compared to all the data, samples taken underground generally had higher concentration levels for our pollutants of interest. 
+
+```{r undergrond.summary.tables}
+#Make table(s) summarizing four exposure variables in this dataset: nodata no2data ocdata ecdata. Include AM, ASD, GM, GSD. Show these summaries both overall and at the facility level.
+#-----------underground.summary.tables -------------
+##using tapply and cbind 
+
+#total table
+DEMSl.u = reshape2::melt(data =DEMS[DEMS$u_s == "u", c("facilityno", "ecdata", "no2data", "nodata", "ocdata")], id = "facilityno")
+xbar = tapply(DEMSl.u$value, DEMSl.u$variable, mean, na.rm=T)
+sd = tapply(DEMSl.u$value, DEMSl.u$variable, sd, na.rm=T)
+
+##replace values <=0 with minimum non-zero value for each variable
+DEMS2.u = DEMS[DEMS$u_s == "u", c("facilityno", "ecdata", "no2data", "nodata", "ocdata")]
+DEMS2.u[2:5] = sapply(DEMS2.u[,2:5], function(x) {ifelse(x <=0, min(x[x>0], na.rm=T), x)})
+DEMS2l.u = reshape2::melt(data =DEMS2.u, id = "facilityno")
+gm  <- tapply(DEMS2l.u$value, DEMS2l.u$variable, geoMean, na.rm=T)
+gsd <- tapply(DEMS2l.u$value, DEMS2l.u$variable, geoSD, na.rm=T)
+n <- tapply(DEMSl.u$value[!is.na(DEMSl.u$value)], DEMSl.u$variable[!is.na(DEMSl.u$value)], length)
+mytable.u = round(cbind(AM=xbar,SD=sd,GM=gm,GSD=gsd,N=n),2)
+
+kable(mytable.u, caption = "Summary Table - All Facilities\nUnderground Only")
+
+```
+
+The tables below show that pollutant levels by facility also tended to be higher underground.  
+
+#check against Coble Table 1, ?and the numbers are similar but not identical.
+
+```{r}
+#summary table fn by facility UNDERGROUND
+summary.table.by.facility.u.fn = function(var) {
+  var = var[DEMS$u_s=="u"]
+  DEMS.u = DEMS[DEMS$u_s=="u",]
+  
+  xbar<-tapply(var, DEMS.u$facilityno, mean, na.rm=T)
+  sd  <-tapply(var, DEMS.u$facilityno, sd, na.rm=T)
+  #convert numbers <=0 to the lowest postive number in the data in order to calculate gm, gsd
+  var2 = ifelse(var <=0, min(var[var > 0], na.rm=T), var)
+  gm  <-tapply(var2, DEMS.u$facilityno, geoMean, na.rm=T)
+  gsd <-tapply(var2, DEMS.u$facilityno, geoSD, na.rm=T)
+  n   <-tapply(var[!is.na(var)], DEMS.u$facilityno[!is.na(var)],length)
+  mytable = round(cbind(AM=xbar,SD=sd,GM=gm,GSD=gsd,N=n),2)
+
+  return(mytable)
+}
+
+##tables for: nodata no2data ocdata ecdata 
+kable(summary.table.by.facility.u.fn(DEMS$nodata), caption = "NO Summary Table - Underground")
+kable(summary.table.by.facility.u.fn(DEMS$no2data), caption = "NO2 Summary Table - Underground")
+kable(summary.table.by.facility.u.fn(DEMS$ocdata), caption = "OC Summary Table - Underground")
+kable(summary.table.by.facility.u.fn(DEMS$ecdata), caption = "EC Summary Table - Underground")
+
+```
+
+
+The following histogram of REC levels shows that the data were right skewed and did not follow a normal distribution (red line).
+
+#? error printing plot: "object '.' not found""
+```{r REC.plots, warning=FALSE, message=FALSE, eval=F}
+#------------REC.plots-------------
+#figures to show the distribution of the REC data
+
+# plot 1 with histogram only and count on the y axis (the default)
+# the default binwidth is 30 and often you will want to change it; see plot 2 for a narrower binwidth.
+#ggplot(data=DEMS,aes(ecdata,na.rm=T)) + geom_histogram(colour="black",fill="white")
+# plot 2 with density
+# base plot, just the histogram, now named 'p' for ease of re-use:
+p <- ggplot(data=DEMS,aes(ecdata,na.rm=T)) + geom_histogram(aes(y=..density..), colour="black", fill="white", binwidth=20)  
+# overlay a normal density plot; need to create some variables to do this
+##number of observations
+N <- sum(!is.na(DEMS$ecdata))
+
+##??? why   length.out=N?
+x <- seq(0, 1000,length.out=N) #divides the range 0-1000 into N equal increments
+##dnorm returns the value of the probability density function for the normal distribution given parameters for x, u, and gamma
+. 
+df <- with(DEMS[!is.na(DEMS$ecdata),], data.frame(x, y = dnorm(x, mean(ecdata), sd(ecdata)) ))
+
+#p +  geom_line(data = df, aes(x = x, y = y), color = "red")
+# plot 3 now also overlays a kernel density plot
+# The alpha parameter (range 0-1) controls the degree of transparency, while the `fill="red"` ensures the overlaid density is a specific color.  We are using the default bandwidth (bw) here.  
+p +  geom_line(data = df, aes(x = x, y = y), color = "red") +
+  geom_density(alpha=.2,fill="red") + labs(x = "REC (ug/m3)")
+
+```
+
+The plots below further differentiate the REC distribution by facility and sampling location. There is a lot of variation in the distributin of REC between facilities. Sample locations also seem to have varied between facilities. Facility H6, for example had all underground samples and these were below 300 ug/m3, while facilty A5 had samples from all three sampling locations with concentrations reaching 1000 ug/m3. 
+
+```{r}
+#ggplot(data=DEMS,aes(ecdata,na.rm=T)) + geom_histogram(aes(y=..density..), colour="black", binwidth=20) + geom_density(alpha=.2, fill="red") + labs(x = "REC (ug/m3)") + facet_wrap(~facilityno, labeller = label_both, scales= "free")
+
+ggplot(data=DEMS,aes(ecdata,na.rm=T)) + geom_histogram(aes(y=..density.., fill = u_snum), position = "dodge",  binwidth=20) + geom_density(alpha=.2, fill="red") + labs(x = "REC (ug/m3)", fill = "Location") + facet_wrap(~facilityno, labeller = label_both, scales= "free")
+
+
+
+```
+
+
+There was a positive association between REC and NO when measurements were taken underground as well when they were taken in a mixed fashion (above and below ground). There did not appear to be astrong association between REC and NO for measurements that were taken on the surface.
+
+```{r no.ec.scatterplot.in}
+#------no.ec.scatterplot.------------
+# Plot 1: simple way to use ggplot to ask for a scatterplot
+ggplot(data = DEMS, aes(nodata, ecdata, na.rm = TRUE)) +
+    geom_point(mapping = aes(color = u_snum)) +
+    geom_smooth(method = "loess", aes(color = u_snum)) +
+    labs(title = paste("Scatterplot of the DEMS NO (ppm) vs. REC (ug/m3) data\n", "colored by where measurements were taken"), x = "NO (ppm)", y = "REC (ug/m3)", color = "Measurement\nlocation")
+
+#+ stat_smooth(method = "loess")
+
+```
+
+
+The figure below replicates COble et al.'s (2010) Figure 2. To enhance these plots, I differentiated by samples that were mixed (both above and below ground), added lowess lines and plotted the figure on fixed (top plot) and free (bottom plot) scales.  
+
+The plots show that the relationship between REC and NO depend on the facility and where the measurements were taken. The relationship between theset two variables is typically positive. The underground data may show the strongest relationship, though this could be because most of the samples were taken underground. 
+
+```{r}
+#q3
+p3a = ggplot(data = DEMS[DEMS$facilityno != "D21",], aes(ecdata, nodata, color = u_snum)) + 
+  geom_point() + 
+  geom_smooth(method = "loess")  +
+    labs(
+    title = paste("Scatterplot of the DEMS NO (ppm) vs. REC (ug/m3) data \n",
+        "separately by facility and colored by where the measurements were taken"),
+    y = "NO (ppm)",
+    x = "REC (ug/m3)",
+    color = "Measurement\nlocation"
+    ) 
+
+
+p3a +   facet_wrap(~ facilityno)  
+p3a +   facet_wrap(~ facilityno, scales  = "free")  
+
+```
+
+```{r}
+p3b = ggplot(data = DEMS[DEMS$facilityno != "D21",], aes(ecdata, no2data, color = u_snum)) + 
+  geom_point() + 
+  geom_smooth(method = "loess")  +
+    labs(
+    title = paste("Scatterplot of the DEMS NO2 (ppm) vs. REC (ug/m3) data \n",
+        "separately by facility and colored by where the measurements were taken"),
+    y = "NO2 (ppm)",
+    x = "REC (ug/m3)",
+    color = "Measurement\nlocation"
+    ) 
+
+
+p3b +   facet_wrap(~ facilityno)  
+p3b +   facet_wrap(~ facilityno, scales  = "free")  
+
+```
+
+ 
+
+
+#4. Discussion and Conclusions
+
+
+#5. Appendices
+##Session Info  
+```{r}
+# Print the session information
+sessionInfo()
+getwd()
+```
+
+##Code  
+```{r,ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=60), include=T}
+```
+
